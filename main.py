@@ -30,8 +30,12 @@ app.add_middleware(
 )
 
 # 静态文件
-frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
+_base = os.path.dirname(__file__)
+frontend_path = os.path.join(_base, "frontend")
+if not os.path.exists(frontend_path):
+    frontend_path = _base
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
 
 # ========== 定时任务调度器 ==========
 scheduler = BackgroundScheduler()
