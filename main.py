@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # 静态文件
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
 # ========== 定时任务调度器 ==========
