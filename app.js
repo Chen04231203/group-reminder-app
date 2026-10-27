@@ -89,6 +89,9 @@ function initUI() {
     const isCustom = e.target.value === 'custom';
     document.getElementById('datetimeGroup').style.display = isCustom ? 'none' : 'block';
     document.getElementById('customScheduleGroup').style.display = isCustom ? 'block' : 'none';
+    if (!isCustom) {
+      document.getElementById('formCron').value = '';
+    }
   });
   
   // 自定义时间选择器
@@ -291,6 +294,13 @@ function openModal(reminder = null) {
   document.querySelector('.cat-btn[data-value="group"]').classList.add('active');
   document.getElementById('datetimeGroup').style.display = 'block';
   document.getElementById('customScheduleGroup').style.display = 'none';
+  
+  // 重置自定义时间选择器
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.weekday-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('formCron').value = '';
+  document.getElementById('formCronManual').value = '';
+  document.getElementById('advancedCronInput').style.display = 'none';
   
   if (reminder) {
     title.textContent = '编辑提醒';
