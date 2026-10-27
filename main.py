@@ -9,12 +9,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlparse
 import os
 import json
 import asyncio
 import httpx
 
-from models import Reminder, Category, Settings, get_db, SessionLocal
+from models import (Reminder, Category, Settings, PushSubscription,
+                    get_db, SessionLocal)
 from schemas import ReminderCreate, ReminderUpdate, ReminderResponse, CategoryCreate, CategoryResponse
 from nlp_parser import parse_reminder
 
@@ -29,12 +31,112 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 静态文件
-_base = os.path.dirname(__file__)
-frontend_path = os.path.join(_base, "frontend")
-if not os.path.exists(frontend_path):
-    frontend_path = _base
+# 静态文件 - 兼容本地和 Render 部署路径
+_base_dir = os.path.dirname(__file__)
+_frontend_paths = [
+    os.path.join(_base_dir, "..", "frontend"),      # 本地: backend/../frontend
+    os.path.join(_base_dir, "frontend"),            # 同级: backend/frontend
+    os.path.join(_base_dir, "..", "..", "frontend"),# 更上级
+    os.path.join(os.getcwd(), "frontend"),          # 当前工作目录/frontend
+    os.getcwd(),                                    # 当前目录本身（Render平铺）
+]
+frontend_path = None
+for p in _frontend_paths:
+    p = os.path.abspath(p)
+    if os.path.exists(p) and os.path.isdir(p):
+        # 检查是否有前端文件
+        if os.path.exists(os.path.join(p, "index.html")) or os.path.exists(os.path.join(p, "app.js")):
+            frontend_path = p
+            break
+
+if not frontend_path:
+    # 兜底：用第一个路径，即使不存在
+    frontend_path = os.path.abspath(os.path.join(_base_dir, "..", "frontend"))
+    print(f"Warning: frontend directory not found, using {frontend_path}")
+
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+# ========== Web Push（浏览器系统推送，关掉网页也能收到） ==========
+# VAPID 密钥固定写死，保证 Render 重启后已订阅的设备依然有效。
+# 如需更换，在 Render 环境变量里设置 VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY 即可覆盖。
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "BP8hSKyH1485IOEmk3iAxVb6vKQQc1lAuoZVu89Gc-_xyUD7ek0eS-aGTUlGsT6Lk7CBPNC7dyIS5P_j_ztSXyc")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", """-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg8m+TKEyllizxcgP4
+qvEgQexl0HIwLuR3+nhuoy0CBNehRANCAAT/IUish9ePOSDhJpN4gMVW+rykEHNZ
+QLqGVbvPRnPv8clA+3pNHkvmhk1JRrE+i5OwgTzQu3ciEuT/4/87Ul8n
+-----END PRIVATE KEY-----""")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:reminder@example.com")
+
+
+def _normalize_vapid_key(key: str) -> str:
+    """py_vapid 只认纯 base64 DER，这里兼容 PEM 格式（带 -----BEGIN----- 头尾）输入"""
+    key = (key or "").strip()
+    if "BEGIN" in key:
+        key = "".join(l for l in key.splitlines() if l and "-----" not in l)
+    return key.replace("\n", "").replace("\r", "").strip()
+
+
+VAPID_PRIVATE_KEY = _normalize_vapid_key(VAPID_PRIVATE_KEY)
+
+
+def _push_payload(title: str, content: str, category: str, reminder_id: int) -> str:
+    return json.dumps({
+        "title": title,
+        "content": content or "",
+        "category": category,
+        "id": reminder_id,
+        "timestamp": datetime.now().isoformat(),
+    }, ensure_ascii=False)
+
+
+def send_web_push(title: str, content: str, category: str, reminder_id: int) -> int:
+    """向所有已订阅设备发送系统推送，返回成功条数。阻塞函数，请用 to_thread 调用。"""
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        print("未安装 pywebpush，跳过 Web Push")
+        return 0
+
+    db = SessionLocal()
+    sent = 0
+    try:
+        subs = db.query(PushSubscription).all()
+        if not subs:
+            return 0
+
+        payload = _push_payload(title, content, category, reminder_id)
+
+        for sub in subs:
+            try:
+                origin = "{0.scheme}://{0.netloc}".format(urlparse(sub.endpoint))
+                webpush(
+                    subscription_info={
+                        "endpoint": sub.endpoint,
+                        "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
+                    },
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": VAPID_SUBJECT, "aud": origin},
+                    ttl=86400,
+                )
+                sub.last_ok = datetime.now()
+                sub.fail_count = 0
+                sent += 1
+            except WebPushException as e:
+                code = getattr(getattr(e, "response", None), "status_code", None)
+                if code in (404, 410):
+                    # 订阅已失效（用户卸载/清缓存），直接清理
+                    db.delete(sub)
+                    print(f"Web Push 订阅失效，已清理: {code}")
+                else:
+                    sub.fail_count = (sub.fail_count or 0) + 1
+                    print(f"Web Push 失败 [{code}]: {e}")
+            except Exception as e:
+                print(f"Web Push 异常: {e}")
+        db.commit()
+    finally:
+        db.close()
+    return sent
 
 
 # ========== 定时任务调度器 ==========
@@ -80,7 +182,23 @@ async def trigger_reminder(reminder_id: int):
                 await client.send_json(payload)
             except:
                 pass
-        
+
+        # 浏览器系统推送（网页关掉也能收到，这是给"懒人"的主力通道）
+        if reminder.push_enabled:
+            try:
+                n = await asyncio.to_thread(
+                    send_web_push,
+                    reminder.title,
+                    reminder.content or "",
+                    reminder.category,
+                    reminder.id,
+                )
+                if n:
+                    print(f"Web Push 已发送 {n} 台设备")
+            except Exception as e:
+                print(f"Web Push 调度失败: {e}")
+
+
         # Webhook 推送（企业微信等）
         if reminder.webhook_url:
             async with httpx.AsyncClient() as client:
@@ -166,6 +284,16 @@ async def load_schedules():
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(frontend_path, "index.html"))
+
+
+@app.get("/sw.js")
+async def service_worker():
+    """Service Worker 必须从根路径提供，作用域才能覆盖整站（否则只能控制 /static/）"""
+    return FileResponse(
+        os.path.join(frontend_path, "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
 
 # ---- AI 智能解析 ----
 
@@ -319,6 +447,94 @@ def update_settings(data: SettingsUpdate, db: Session = Depends(get_db)):
             db.add(setting)
         db.commit()
     return {"message": "设置已更新"}
+
+# ---- Web Push 订阅管理 ----
+
+class PushSubIn(BaseModel):
+    endpoint: str
+    keys: dict
+    device: Optional[str] = None
+
+class PushUnsubIn(BaseModel):
+    endpoint: str
+
+@app.get("/api/push/vapid-public-key")
+def get_vapid_public_key():
+    """前端订阅时需要公钥"""
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+@app.post("/api/push/subscribe")
+def subscribe_push(data: PushSubIn, db: Session = Depends(get_db)):
+    p256dh = data.keys.get("p256dh")
+    auth = data.keys.get("auth")
+    if not (data.endpoint and p256dh and auth):
+        raise HTTPException(status_code=400, detail="订阅信息不完整")
+
+    sub = db.query(PushSubscription).filter(
+        PushSubscription.endpoint == data.endpoint).first()
+    if sub:
+        sub.p256dh = p256dh
+        sub.auth = auth
+        sub.device = data.device or sub.device
+        sub.fail_count = 0
+    else:
+        db.add(PushSubscription(
+            endpoint=data.endpoint, p256dh=p256dh, auth=auth,
+            device=data.device,
+        ))
+    db.commit()
+    return {"message": "订阅成功", "count": db.query(PushSubscription).count()}
+
+@app.post("/api/push/unsubscribe")
+def unsubscribe_push(data: PushUnsubIn, db: Session = Depends(get_db)):
+    db.query(PushSubscription).filter(
+        PushSubscription.endpoint == data.endpoint).delete()
+    db.commit()
+    return {"message": "已取消订阅", "count": db.query(PushSubscription).count()}
+
+@app.get("/api/push/status")
+def push_status(db: Session = Depends(get_db)):
+    subs = db.query(PushSubscription).all()
+    return {
+        "count": len(subs),
+        "devices": [{
+            "device": s.device or "未知设备",
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "last_ok": s.last_ok.isoformat() if s.last_ok else None,
+        } for s in subs],
+    }
+
+@app.post("/api/push/test")
+async def push_test(db: Session = Depends(get_db)):
+    """发一条测试推送，验证手机/电脑能不能收到"""
+    total = db.query(PushSubscription).count()
+    if total == 0:
+        return {"sent": 0, "total": 0,
+                "message": "还没有设备订阅，请先点「开启系统推送」"}
+
+    n = await asyncio.to_thread(
+        send_web_push, "测试推送 ✅",
+        "看到这条通知就说明系统推送已生效，网页关掉也能收到啦！", "task", 0)
+
+    if n:
+        msg = f"已发送到 {n}/{total} 台设备，去看看通知栏"
+    else:
+        msg = f"{total} 台设备都没发出去，请查看 Render 日志"
+    return {"sent": n, "total": total, "message": msg}
+
+@app.get("/api/health")
+def health_check():
+    """给 UptimeRobot 之类的保活服务用，防止 Render 免费版休眠"""
+    db = SessionLocal()
+    try:
+        return {
+            "status": "ok",
+            "time": datetime.now().isoformat(),
+            "reminders": db.query(Reminder).count(),
+            "push_devices": db.query(PushSubscription).count(),
+        }
+    finally:
+        db.close()
 
 # ---- WebSocket (实时推送) ----
 

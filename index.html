@@ -6,9 +6,23 @@
   <meta name="theme-color" content="#534AB7">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="提醒助手">
   <title>群通知提醒助手</title>
   <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="icon" type="image/png" href="/static/icon-192.png">
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    // 老版本可能缓存了 /static/sw.js（作用域只在 /static/），先清理掉
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => {
+          const url = (r.active || r.installing || r.waiting || {}).scriptURL || '';
+          if (url.endsWith('/static/sw.js')) r.unregister();
+        });
+      });
+    }
+  </script>
 </head>
 <body>
   <div id="app">
@@ -60,6 +74,15 @@
             <span class="slider"></span>
           </label>
           <span>推送通知</span>
+        </div>
+        <div class="push-box" id="pushBox">
+          <div class="push-title">
+            <span>系统推送</span>
+            <span class="push-state" id="pushState">未开启</span>
+          </div>
+          <div class="push-hint" id="pushHint">开启后关掉网页也能收到提醒</div>
+          <button class="btn btn-push" id="btnEnablePush">开启系统推送</button>
+          <button class="btn btn-ghost btn-push-test" id="btnTestPush" style="display:none">发一条测试推送</button>
         </div>
       </div>
     </aside>
@@ -167,7 +190,33 @@
           </div>
           <div class="form-group" id="datetimeGroup">
             <label>提醒时间</label>
+            
+            <!-- 快捷日期 -->
+            <div class="quick-row">
+              <span class="quick-label">快速选日期</span>
+              <div class="quick-btns">
+                <button type="button" class="quick-btn" data-day="0">今天</button>
+                <button type="button" class="quick-btn" data-day="1">明天</button>
+                <button type="button" class="quick-btn" data-day="2">后天</button>
+                <button type="button" class="quick-btn" data-day="7">下周今天</button>
+              </div>
+            </div>
+            
+            <!-- 快捷时间 -->
+            <div class="quick-row">
+              <span class="quick-label">快速选时间</span>
+              <div class="quick-btns">
+                <button type="button" class="quick-btn" data-time="08:00">8:00</button>
+                <button type="button" class="quick-btn" data-time="09:00">9:00</button>
+                <button type="button" class="quick-btn" data-time="12:00">12:00</button>
+                <button type="button" class="quick-btn" data-time="15:00">15:00</button>
+                <button type="button" class="quick-btn" data-time="18:00">18:00</button>
+                <button type="button" class="quick-btn" data-time="20:00">20:00</button>
+              </div>
+            </div>
+            
             <input type="datetime-local" id="formDatetime">
+            <div class="form-hint" id="datetimeHint">当前选择：—</div>
           </div>
           <!-- 自定义高级时间选择器 -->
           <div class="form-group" id="customScheduleGroup" style="display:none">

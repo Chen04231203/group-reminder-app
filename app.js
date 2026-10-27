@@ -13,14 +13,26 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadStats();
   loadReminders();
-  requestNotificationPermission();
+  initPushUI();
 });
 
 // ===== PWA =====
 function initPWA() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/sw.js')
-      .then(reg => console.log('SW registered'))
+    // 必须从根路径注册，作用域才能覆盖整站
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(reg => {
+        console.log('SW registered, scope:', reg.scope);
+        // 有新版本时自动接管，避免用户一直用旧缓存
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              nw.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      })
       .catch(err => console.log('SW failed:', err));
   }
 }
@@ -96,6 +108,9 @@ function initUI() {
   
   // 自定义时间选择器
   initCustomSchedule();
+  
+  // 快捷日期/时间按钮
+  initQuickDatetime();
   
   // AI 智能识别
   document.getElementById('btnAIParse').addEventListener('click', openAiModal);
@@ -332,14 +347,75 @@ function openModal(reminder = null) {
   } else {
     title.textContent = '新建提醒';
     document.getElementById('reminderId').value = '';
-    // 默认设置明天同一时间
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
-    document.getElementById('formDatetime').value = tomorrow.toISOString().slice(0, 16);
+    // 默认 1 小时后（避免移动端显示空白）
+    const soon = new Date();
+    soon.setHours(soon.getHours() + 1);
+    soon.setMinutes(0, 0, 0);
+    soon.setMinutes(soon.getMinutes() - soon.getTimezoneOffset());
+    document.getElementById('formDatetime').value = soon.toISOString().slice(0, 16);
   }
   
+  // 清理快捷按钮状态
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  updateDatetimeHint();
+  
   modal.classList.add('show');
+}
+
+// 更新日期提示文字
+function updateDatetimeHint() {
+  const val = document.getElementById('formDatetime').value;
+  const hint = document.getElementById('datetimeHint');
+  if (!hint) return;
+  if (!val) {
+    hint.textContent = '当前选择：未设置';
+    return;
+  }
+  const d = new Date(val);
+  hint.textContent = `当前选择：${formatDateTime(d)}`;
+}
+
+// 快捷日期/时间按钮
+function initQuickDatetime() {
+  // 快捷日期
+  document.querySelectorAll('.quick-btn[data-day]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quick-btn[data-day]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      const days = parseInt(btn.dataset.day);
+      const input = document.getElementById('formDatetime');
+      let base = input.value ? new Date(input.value) : new Date();
+      if (!input.value) {
+        base.setHours(new Date().getHours() + 1, 0, 0, 0);
+      }
+      const target = new Date();
+      target.setDate(target.getDate() + days);
+      target.setHours(base.getHours(), base.getMinutes(), 0, 0);
+      target.setMinutes(target.getMinutes() - target.getTimezoneOffset());
+      input.value = target.toISOString().slice(0, 16);
+      updateDatetimeHint();
+    });
+  });
+  
+  // 快捷时间
+  document.querySelectorAll('.quick-btn[data-time]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quick-btn[data-time]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      const input = document.getElementById('formDatetime');
+      const [h, m] = btn.dataset.time.split(':').map(Number);
+      let base = input.value ? new Date(input.value) : new Date();
+      base.setHours(h, m, 0, 0);
+      base.setMinutes(base.getMinutes() - base.getTimezoneOffset());
+      input.value = base.toISOString().slice(0, 16);
+      updateDatetimeHint();
+    });
+  });
+  
+  // 手动改时间也更新提示
+  document.getElementById('formDatetime').addEventListener('change', updateDatetimeHint);
 }
 
 function closeModal() {
@@ -635,8 +711,23 @@ async function handleAiConfirm() {
     const dt = new Date(aiParsedResult.remind_at);
     dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
     document.getElementById('formDatetime').value = dt.toISOString().slice(0, 16);
+    updateDatetimeHint();
   }
-  
+
+  // 设置重复规则（AI 识别出"每周一三五""每天"时自动套用）
+  if (aiParsedResult.reminder_type && aiParsedResult.reminder_type !== 'once') {
+    const typeSel = document.getElementById('formType');
+    typeSel.value = aiParsedResult.reminder_type;
+    const isCustom = aiParsedResult.reminder_type === 'custom';
+    document.getElementById('datetimeGroup').style.display = isCustom ? 'none' : 'block';
+    document.getElementById('customScheduleGroup').style.display = isCustom ? 'block' : 'none';
+    if (isCustom && aiParsedResult.cron_expression) {
+      document.getElementById('formCron').value = aiParsedResult.cron_expression;
+      document.getElementById('formCronManual').value = aiParsedResult.cron_expression;
+      showToast(`已识别重复规则：${aiParsedResult.cron_expression}`);
+    }
+  }
+
   showToast('已自动填充，请确认后保存');
 }
 
@@ -756,5 +847,172 @@ function initCustomSchedule() {
       };
     }
     return { minute: 0, hour: 9, weekday: 1 };
+  }
+}
+
+// ===== 系统推送（Web Push）：关掉网页也能收到 =====
+let swRegistration = null;
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+}
+
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+async function initPushUI() {
+  const stateEl = document.getElementById('pushState');
+  const hintEl = document.getElementById('pushHint');
+  const btn = document.getElementById('btnEnablePush');
+  const testBtn = document.getElementById('btnTestPush');
+  if (!btn) return;
+
+  if (!pushSupported()) {
+    stateEl.textContent = '不支持';
+    stateEl.className = 'push-state off';
+    hintEl.textContent = isIOS() && !isStandalone()
+      ? 'iPhone 需先「添加到主屏幕」，再从桌面图标打开才能开启推送'
+      : '当前浏览器不支持系统推送，建议用 Chrome / Edge / Safari';
+    btn.disabled = true;
+    btn.textContent = '当前环境不支持';
+    return;
+  }
+
+  // iOS 只有"添加到主屏幕"后的 PWA 模式才允许订阅
+  if (isIOS() && !isStandalone()) {
+    stateEl.textContent = '需加到主屏幕';
+    stateEl.className = 'push-state off';
+    hintEl.textContent = '点浏览器底部分享按钮 → 「添加到主屏幕」，再从桌面图标打开本页，才能开启推送';
+    btn.disabled = true;
+    btn.textContent = '请先添加到主屏幕';
+    return;
+  }
+
+  btn.addEventListener('click', enablePush);
+  testBtn.addEventListener('click', testPush);
+  await refreshPushState();
+}
+
+async function refreshPushState() {
+  const stateEl = document.getElementById('pushState');
+  const hintEl = document.getElementById('pushHint');
+  const btn = document.getElementById('btnEnablePush');
+  const testBtn = document.getElementById('btnTestPush');
+  if (!stateEl) return;
+
+  try {
+    swRegistration = await navigator.serviceWorker.ready;
+    const sub = await swRegistration.pushManager.getSubscription();
+    const perm = Notification.permission;
+
+    if (sub && perm === 'granted') {
+      stateEl.textContent = '已开启';
+      stateEl.className = 'push-state on';
+      hintEl.textContent = '关掉网页也能收到提醒，可以点下面发一条测试看看';
+      btn.textContent = '重新订阅';
+      testBtn.style.display = 'block';
+      syncSubscription(sub); // 服务端重启后自动补登记
+    } else if (perm === 'denied') {
+      stateEl.textContent = '已被拒绝';
+      stateEl.className = 'push-state off';
+      hintEl.textContent = '通知权限被浏览器拒绝了，需到浏览器设置里手动允许本站通知';
+      btn.textContent = '去开启（需手动改设置）';
+      testBtn.style.display = 'none';
+    } else {
+      stateEl.textContent = '未开启';
+      stateEl.className = 'push-state';
+      hintEl.textContent = '开启后关掉网页也能收到提醒';
+      btn.textContent = '开启系统推送';
+      testBtn.style.display = 'none';
+    }
+  } catch (e) {
+    console.log('读取推送状态失败', e);
+  }
+}
+
+async function enablePush() {
+  const btn = document.getElementById('btnEnablePush');
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '正在开启...';
+
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      showToast('没有获得通知权限，无法推送');
+      await refreshPushState();
+      return;
+    }
+
+    swRegistration = await navigator.serviceWorker.ready;
+    const res = await fetch(`${API_BASE}/api/push/vapid-public-key`);
+    const { publicKey } = await res.json();
+
+    let sub = await swRegistration.pushManager.getSubscription();
+    if (!sub) {
+      sub = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+    }
+
+    await syncSubscription(sub);
+    showToast('系统推送已开启，关掉网页也能收到啦');
+    await refreshPushState();
+  } catch (e) {
+    console.error(e);
+    showToast('开启失败：' + (e.message || e));
+    btn.textContent = old;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function syncSubscription(sub) {
+  const ua = navigator.userAgent;
+  const device = /iPhone|iPad|iPod/.test(ua) ? 'iPhone/iPad'
+    : /Android/.test(ua) ? 'Android 手机'
+      : '电脑浏览器';
+  try {
+    const keys = (sub.toJSON && sub.toJSON().keys) || {};
+    await fetch(`${API_BASE}/api/push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: sub.endpoint, keys, device })
+    });
+  } catch (e) {
+    console.log('同步订阅失败', e);
+  }
+}
+
+async function testPush() {
+  const btn = document.getElementById('btnTestPush');
+  btn.disabled = true;
+  btn.textContent = '发送中...';
+  try {
+    const res = await fetch(`${API_BASE}/api/push/test`, { method: 'POST' });
+    const data = await res.json();
+    showToast(data.message || '已发送');
+  } catch (e) {
+    showToast('发送失败，请检查网络');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '发一条测试推送';
   }
 }

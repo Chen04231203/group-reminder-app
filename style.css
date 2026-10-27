@@ -528,6 +528,46 @@ input:checked + .slider::before { transform: translateX(20px); background: #fff;
 }
 .overlay.show { display: block; }
 
+/* ===== 快捷日期/时间 ===== */
+.quick-row {
+  margin-bottom: 10px;
+}
+.quick-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.quick-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.quick-btn {
+  padding: 7px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-btn:hover {
+  border-color: var(--accent-purple);
+  color: var(--accent-purple-light);
+}
+.quick-btn.active {
+  background: rgba(83, 74, 183, 0.2);
+  border-color: var(--accent-purple);
+  color: var(--accent-purple-light);
+  font-weight: 500;
+}
+#formDatetime {
+  margin-top: 4px;
+}
+
 /* ===== 自定义时间选择器 ===== */
 .preset-templates,
 .weekday-selector,
@@ -731,3 +771,77 @@ input:checked + .slider::before { transform: translateX(20px); background: #fff;
   to { opacity: 1; transform: translateY(0); }
 }
 .reminder-card { animation: fadeIn 0.3s ease; }
+
+/* ===== 系统推送（Web Push）区块 ===== */
+.push-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(83, 74, 183, 0.10);
+  border: 1px solid rgba(83, 74, 183, 0.25);
+}
+
+.push-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.push-state {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 0.85;
+}
+
+.push-state.on {
+  background: rgba(56, 176, 106, 0.22);
+  color: #38b06a;
+}
+
+.push-state.off {
+  background: rgba(220, 80, 80, 0.18);
+  color: #e06464;
+}
+
+.push-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.btn-push {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  background: #534AB7;
+  color: #fff;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+
+.btn-push:hover { opacity: 0.88; }
+.btn-push:disabled { opacity: 0.5; cursor: default; }
+
+.btn-push-test {
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid rgba(83, 74, 183, 0.45);
+  color: inherit;
+  cursor: pointer;
+}
+
+.btn-push-test:hover { background: rgba(83, 74, 183, 0.12); }

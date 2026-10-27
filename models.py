@@ -47,6 +47,19 @@ class Settings(Base):
     value = Column(String(500), nullable=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+class PushSubscription(Base):
+    """浏览器 Web Push 订阅（关掉网页也能收推送）"""
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
+    device = Column(String(200), nullable=True)   # 设备描述，方便区分手机/电脑
+    created_at = Column(DateTime, default=datetime.now)
+    last_ok = Column(DateTime, nullable=True)     # 最近一次推送成功时间
+    fail_count = Column(Integer, default=0)       # 连续失败次数，过多则清理
+
 # 初始化数据库
 Base.metadata.create_all(bind=engine)
 
