@@ -86,10 +86,13 @@ function initUI() {
   
   // 提醒类型切换
   document.getElementById('formType').addEventListener('change', (e) => {
-    const isCron = e.target.value === 'custom';
-    document.getElementById('datetimeGroup').style.display = isCron ? 'none' : 'block';
-    document.getElementById('cronGroup').style.display = isCron ? 'block' : 'none';
+    const isCustom = e.target.value === 'custom';
+    document.getElementById('datetimeGroup').style.display = isCustom ? 'none' : 'block';
+    document.getElementById('customScheduleGroup').style.display = isCustom ? 'block' : 'none';
   });
+  
+  // 自定义时间选择器
+  initCustomSchedule();
   
   // AI 智能识别
   document.getElementById('btnAIParse').addEventListener('click', openAiModal);
@@ -655,5 +658,93 @@ async function updateGlobalSound(enabled) {
   } catch (e) {
     showToast('设置保存失败');
     document.getElementById('soundToggle').checked = !enabled;
+  }
+}
+
+// ===== 自定义时间选择器 =====
+function initCustomSchedule() {
+  let selectedWeekdays = [];
+  let currentCron = '';
+  
+  // 预设模板
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.weekday-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedWeekdays = [];
+      currentCron = btn.dataset.cron;
+      document.getElementById('formCron').value = currentCron;
+    });
+  });
+  
+  // 星期选择
+  document.querySelectorAll('.weekday-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.toggle('active');
+      const day = btn.dataset.day;
+      if (btn.classList.contains('active')) {
+        if (!selectedWeekdays.includes(day)) selectedWeekdays.push(day);
+      } else {
+        selectedWeekdays = selectedWeekdays.filter(d => d !== day);
+      }
+      updateWeekdayCron();
+    });
+  });
+  
+  function updateWeekdayCron() {
+    if (selectedWeekdays.length === 0) {
+      document.getElementById('formCron').value = '';
+      return;
+    }
+    const time = getCustomTime();
+    const days = selectedWeekdays.sort((a, b) => parseInt(a) - parseInt(b)).join(',');
+    currentCron = `${time.minute} ${time.hour} * * ${days}`;
+    document.getElementById('formCron').value = currentCron;
+  }
+  
+  // 间隔应用
+  document.getElementById('btnApplyInterval').addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.weekday-btn').forEach(b => b.classList.remove('active'));
+    selectedWeekdays = [];
+    
+    const num = parseInt(document.getElementById('intervalNum').value) || 1;
+    const unit = document.getElementById('intervalUnit').value;
+    const time = getCustomTime();
+    
+    if (unit === 'hour') {
+      currentCron = `0 */${num} * * *`;
+    } else if (unit === 'day') {
+      currentCron = `${time.minute} ${time.hour} */${num} * *`;
+    } else if (unit === 'week') {
+      currentCron = `${time.minute} ${time.hour} * * ${time.weekday}`;
+    }
+    document.getElementById('formCron').value = currentCron;
+    showToast(`已设置：每${num}${unit === 'hour' ? '小时' : unit === 'day' ? '天' : '周'}`);
+  });
+  
+  // 高级模式切换
+  document.getElementById('btnAdvancedCron').addEventListener('click', () => {
+    const el = document.getElementById('advancedCronInput');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  });
+  
+  document.getElementById('formCronManual').addEventListener('input', (e) => {
+    document.getElementById('formCron').value = e.target.value;
+  });
+  
+  function getCustomTime() {
+    const dt = document.getElementById('formDatetime').value;
+    if (dt) {
+      const d = new Date(dt);
+      return {
+        minute: d.getMinutes(),
+        hour: d.getHours(),
+        weekday: d.getDay()
+      };
+    }
+    return { minute: 0, hour: 9, weekday: 1 };
   }
 }
