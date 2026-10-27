@@ -290,7 +290,7 @@ function openModal(reminder = null) {
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.cat-btn[data-value="group"]').classList.add('active');
   document.getElementById('datetimeGroup').style.display = 'block';
-  document.getElementById('cronGroup').style.display = 'none';
+  document.getElementById('customScheduleGroup').style.display = 'none';
   
   if (reminder) {
     title.textContent = '编辑提醒';
@@ -317,7 +317,7 @@ function openModal(reminder = null) {
     
     if (reminder.reminder_type === 'custom') {
       document.getElementById('datetimeGroup').style.display = 'none';
-      document.getElementById('cronGroup').style.display = 'block';
+      document.getElementById('customScheduleGroup').style.display = 'block';
     }
   } else {
     title.textContent = '新建提醒';
