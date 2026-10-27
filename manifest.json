@@ -1,0 +1,22 @@
+{
+  "name": "群通知提醒助手",
+  "short_name": "提醒助手",
+  "description": "群通知、任务提醒、作业提醒一站式管理",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#534AB7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%23534AB7' width='192' height='192' rx='32'/%3E%3Ctext x='96' y='120' text-anchor='middle' fill='white' font-size='80' font-family='Arial'%3E%F0%9F%94%94%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23534AB7' width='512' height='512' rx='64'/%3E%3Ctext x='256' y='320' text-anchor='middle' fill='white' font-size='220' font-family='Arial'%3E%F0%9F%94%94%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

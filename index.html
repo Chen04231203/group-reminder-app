@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#534AB7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>群通知提醒助手</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">&#128276;</span>
+          <span class="logo-text">提醒助手</span>
+        </div>
+        <button class="sidebar-close" id="sidebarClose">&times;</button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">&#128202;</span>
+          <span>概览</span>
+        </a>
+        <a href="#" class="nav-item" data-view="reminders">
+          <span class="nav-icon">&#128276;</span>
+          <span>提醒列表</span>
+        </a>
+        <a href="#" class="nav-item" data-view="groups">
+          <span class="nav-icon">&#128172;</span>
+          <span>群通知</span>
+        </a>
+        <a href="#" class="nav-item" data-view="tasks">
+          <span class="nav-icon">&#128203;</span>
+          <span>任务提醒</span>
+        </a>
+        <a href="#" class="nav-item" data-view="homework">
+          <span class="nav-icon">&#128221;</span>
+          <span>作业提醒</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="btn btn-primary btn-block" id="btnAddReminder">
+          <span class="btn-icon">+</span> 新建提醒
+        </button>
+        <div class="notification-toggle">
+          <label class="switch">
+            <input type="checkbox" id="soundToggle">
+            <span class="slider"></span>
+          </label>
+          <span>声音提醒</span>
+        </div>
+        <div class="notification-toggle">
+          <label class="switch">
+            <input type="checkbox" id="notificationToggle">
+            <span class="slider"></span>
+          </label>
+          <span>推送通知</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 遮罩层 -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部栏 -->
+      <header class="topbar">
+        <button class="menu-toggle" id="menuToggle">&#9776;</button>
+        <h1 class="page-title" id="pageTitle">概览</h1>
+        <div class="topbar-actions">
+          <button class="btn-icon-only" id="btnAIParse" title="AI 智能识别">&#129302;</button>
+          <button class="btn-icon-only" id="btnSearch" title="搜索">&#128269;</button>
+          <button class="btn-icon-only" id="btnRefresh" title="刷新">&#128260;</button>
+        </div>
+      </header>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card stat-total">
+          <div class="stat-number" id="statTotal">0</div>
+          <div class="stat-label">全部提醒</div>
+        </div>
+        <div class="stat-card stat-active">
+          <div class="stat-number" id="statActive">0</div>
+          <div class="stat-label">进行中</div>
+        </div>
+        <div class="stat-card stat-group">
+          <div class="stat-number" id="statGroup">0</div>
+          <div class="stat-label">群通知</div>
+        </div>
+        <div class="stat-card stat-task">
+          <div class="stat-number" id="statTask">0</div>
+          <div class="stat-label">任务</div>
+        </div>
+        <div class="stat-card stat-homework">
+          <div class="stat-number" id="statHomework">0</div>
+          <div class="stat-label">作业</div>
+        </div>
+        <div class="stat-card stat-today">
+          <div class="stat-number" id="statToday">0</div>
+          <div class="stat-label">今日</div>
+        </div>
+      </div>
+
+      <!-- 搜索栏 -->
+      <div class="search-bar" id="searchBar" style="display:none">
+        <input type="text" class="search-input" id="searchInput" placeholder="搜索提醒...">
+        <button class="search-close" id="searchClose">&times;</button>
+      </div>
+
+      <!-- 提醒列表 -->
+      <div class="reminder-list" id="reminderList"></div>
+
+      <!-- 空状态 -->
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">&#128276;</div>
+        <div class="empty-title">还没有提醒</div>
+        <div class="empty-desc">点击上方按钮创建你的第一个提醒</div>
+      </div>
+    </main>
+
+    <!-- 新建/编辑弹窗 -->
+    <div class="modal" id="reminderModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">新建提醒</h2>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <form class="modal-body" id="reminderForm">
+          <input type="hidden" id="reminderId">
+          <div class="form-group">
+            <label>标题 <span class="required">*</span></label>
+            <input type="text" id="formTitle" placeholder="例如：明天上午开会" required>
+          </div>
+          <div class="form-group">
+            <label>内容</label>
+            <textarea id="formContent" rows="3" placeholder="提醒的具体内容..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>分类</label>
+            <div class="category-selector" id="categorySelector">
+              <button type="button" class="cat-btn active" data-value="group">
+                <span class="cat-icon">&#128172;</span>群通知
+              </button>
+              <button type="button" class="cat-btn" data-value="task">
+                <span class="cat-icon">&#128203;</span>任务
+              </button>
+              <button type="button" class="cat-btn" data-value="homework">
+                <span class="cat-icon">&#128221;</span>作业
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>提醒类型</label>
+            <select id="formType">
+              <option value="once">一次性</option>
+              <option value="daily">每天</option>
+              <option value="weekly">每周</option>
+              <option value="custom">自定义 (cron)</option>
+            </select>
+          </div>
+          <div class="form-group" id="datetimeGroup">
+            <label>提醒时间</label>
+            <input type="datetime-local" id="formDatetime">
+          </div>
+          <div class="form-group" id="cronGroup" style="display:none">
+            <label>Cron 表达式</label>
+            <input type="text" id="formCron" placeholder="分 时 日 月 周">
+            <div class="form-hint">例如：0 9 * * 1-5 表示工作日每天9点</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="formSound" checked>
+                <span>声音提醒</span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="formPush" checked>
+                <span>推送通知</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>企业微信 Webhook (可选)</label>
+            <input type="text" id="formWebhook" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/...">
+            <div class="form-hint">填写后可自动推送到企业微信群</div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="btnCancel">取消</button>
+            <button type="submit" class="btn btn-primary">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 提醒触发弹窗 -->
+    <div class="modal modal-notification" id="notificationModal">
+      <div class="modal-content notification-content">
+        <div class="notification-icon">&#128276;</div>
+        <h2 class="notification-title" id="notifTitle">提醒</h2>
+        <p class="notification-body" id="notifBody"></p>
+        <div class="notification-actions">
+          <button class="btn btn-secondary" id="btnDismiss">忽略</button>
+          <button class="btn btn-primary" id="btnCopyContent">复制内容</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 智能识别弹窗 -->
+    <div class="modal" id="aiParseModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>&#129302; AI 智能识别</h2>
+          <button class="modal-close" id="aiModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>粘贴微信消息或自然语言描述</label>
+            <textarea id="aiInput" rows="4" placeholder="例如：明天下午3点交作业&#10;周五上午10点开会&#10;下周一交报告"></textarea>
+          </div>
+          <div class="ai-examples">
+            <div class="ai-example-title">支持的格式示例：</div>
+            <div class="ai-example-item">&#8226; 明天下午3点交作业</div>
+            <div class="ai-example-item">&#8226; 周五上午10点开会</div>
+            <div class="ai-example-item">&#8226; 下周一交报告</div>
+            <div class="ai-example-item">&#8226; 12月25号圣诞节活动</div>
+            <div class="ai-example-item">&#8226; 3天后交论文</div>
+          </div>
+          <div id="aiResult" style="display:none; margin-top:16px;">
+            <div class="ai-result-box">
+              <div class="ai-result-title">识别结果</div>
+              <div class="ai-result-item"><strong>标题：</strong><span id="aiResultTitle"></span></div>
+              <div class="ai-result-item"><strong>分类：</strong><span id="aiResultCategory"></span></div>
+              <div class="ai-result-item"><strong>时间：</strong><span id="aiResultTime"></span></div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="btnAiCancel">取消</button>
+            <button type="button" class="btn btn-primary" id="btnAiParse">&#128269; 识别</button>
+            <button type="button" class="btn btn-success" id="btnAiConfirm" style="display:none;">&#10003; 确认创建</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>群通知提醒助手 - 使用说明</title>
+<style>
+:root {
+  --primary: #534AB7;
+  --primary-light: #7F77DD;
+  --secondary: #1D9E75;
+  --bg: #0f0f1a;
+  --bg-card: #1a1a2e;
+  --bg-light: #252540;
+  --text: #e8e8f0;
+  --text-muted: #a0a0b8;
+  --border: #2d2d4a;
+  --radius: 14px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+.container { max-width: 720px; margin: 0 auto; padding: 20px; }
+
+/* Header */
+.hero {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, var(--primary), #3C3489);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+}
+.hero-icon { font-size: 56px; margin-bottom: 12px; }
+.hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+.hero p { font-size: 15px; opacity: 0.85; }
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary-light);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Steps */
+.step { display: flex; gap: 14px; margin-bottom: 16px; }
+.step-icon {
+  width: 40px; height: 40px;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.step-body { flex: 1; }
+.step-body h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.step-body p { font-size: 14px; color: var(--text-muted); }
+
+/* Features */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.feature-item {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.feature-item .icon { font-size: 28px; margin-bottom: 6px; }
+.feature-item .label { font-size: 13px; color: var(--text-muted); }
+
+/* AI Demo */
+.ai-demo {
+  background: rgba(83, 74, 183, 0.1);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+}
+.ai-demo-title {
+  font-size: 13px;
+  color: var(--primary-light);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.ai-example {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.ai-example .input { color: var(--text-muted); font-size: 12px; margin-bottom: 2px; }
+.ai-example .output { color: var(--secondary); font-size: 13px; }
+
+/* QR */
+.qr-section {
+  text-align: center;
+  padding: 24px;
+  background: var(--bg-light);
+  border-radius: var(--radius);
+  border: 2px dashed var(--border);
+}
+.qr-placeholder {
+  width: 160px; height: 160px;
+  background: var(--bg);
+  border-radius: 12px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+}
+.qr-text { font-size: 13px; color: var(--text-muted); }
+
+/* Tips */
+.tip {
+  background: rgba(29, 158, 117, 0.1);
+  border-left: 3px solid var(--secondary);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.tip strong { color: var(--secondary); }
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .feature-grid { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-icon">&#128276;</div>
+    <h1>群通知提醒助手</h1>
+    <p>粘贴微信消息，AI 自动识别时间，再也不怕忘记作业和活动</p>
+  </div>
+
+  <!-- 功能介绍 -->
+  <div class="card">
+    <div class="card-title"><span>&#10024;</span> 能做什么</div>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="icon">&#129302;</div>
+        <div class="label">AI 智能识别</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#128276;</div>
+        <div class="label">弹窗提醒</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#128266;</div>
+        <div class="label">声音提醒</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#128241;</div>
+        <div class="label">手机电脑通用</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 启动步骤 -->
+  <div class="card">
+    <div class="card-title"><span class="num">1</span> 启动软件</div>
+    <div class="step">
+      <div class="step-icon">&#128187;</div>
+      <div class="step-body">
+        <h3>双击 start_enhanced.bat</h3>
+        <p>第一次运行会自动安装环境，等几分钟就好。之后每次双击直接用。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#128279;</div>
+      <div class="step-body">
+        <h3>自动打开浏览器</h3>
+        <p>启动后会自动弹出浏览器页面，同时显示二维码。</p>
+      </div>
+    </div>
+    <div class="tip">
+      <strong>提示：</strong>如果 Windows 弹出防火墙提示，请点击"允许访问"。
+    </div>
+  </div>
+
+  <!-- 手机使用 -->
+  <div class="card">
+    <div class="card-title"><span class="num">2</span> 手机使用</div>
+    <div class="step">
+      <div class="step-icon">&#128247;</div>
+      <div class="step-body">
+        <h3>扫二维码</h3>
+        <p>用微信或手机浏览器扫描电脑上弹出的二维码。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#127912;</div>
+      <div class="step-body">
+        <h3>添加到主屏幕</h3>
+        <p>Android：浏览器菜单 → "添加到主屏幕"<br>
+           iOS：底部分享按钮 → "添加到主屏幕"</p>
+      </div>
+    </div>
+    <div class="qr-section">
+      <div class="qr-placeholder">&#128247;</div>
+      <div class="qr-text">启动后会在这里显示二维码</div>
+    </div>
+  </div>
+
+  <!-- AI 使用 -->
+  <div class="card">
+    <div class="card-title"><span class="num">3</span> 创建提醒（AI 方式）</div>
+    <div class="step">
+      <div class="step-icon">&#129302;</div>
+      <div class="step-body">
+        <h3>点击顶部 "AI 智能识别" 按钮</h3>
+        <p>页面最上方有一个机器人图标按钮。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#128203;</div>
+      <div class="step-body">
+        <h3>粘贴微信消息</h3>
+        <p>把群里收到的消息直接复制粘贴进去。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#9989;</div>
+      <div class="step-body">
+        <h3>点识别 → 确认 → 保存</h3>
+        <p>AI 自动填好时间和分类，你确认一下就行。</p>
+      </div>
+    </div>
+
+    <div class="ai-demo">
+      <div class="ai-demo-title">&#128161; AI 识别示例</div>
+      <div class="ai-example">
+        <div class="input">输入：明天下午3点交作业</div>
+        <div class="output">&#8594; 时间：明天 15:00 | 分类：作业</div>
+      </div>
+      <div class="ai-example">
+        <div class="input">输入：周五上午10点开会</div>
+        <div class="output">&#8594; 时间：周五 10:00 | 分类：群通知</div>
+      </div>
+      <div class="ai-example">
+        <div class="input">输入：下周一记得带身份证</div>
+        <div class="output">&#8594; 时间：下周一 09:00 | 分类：任务</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 手动创建 -->
+  <div class="card">
+    <div class="card-title"><span class="num">4</span> 创建提醒（手动方式）</div>
+    <div class="step">
+      <div class="step-icon">&#10133;</div>
+      <div class="step-body">
+        <h3>点击"新建提醒"</h3>
+        <p>左侧导航栏底部或页面右上角的 + 按钮。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#128221;</div>
+      <div class="step-body">
+        <h3>填写信息</h3>
+        <p>标题、内容、分类、提醒时间，选声音和推送。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#128190;</div>
+      <div class="step-body">
+        <h3>保存</h3>
+        <p>点保存，到时间自动提醒你。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提醒频率 -->
+  <div class="card">
+    <div class="card-title"><span class="num">5</span> 提醒频率设置</div>
+    <p style="color:var(--text-muted); font-size:14px; margin-bottom:12px;">创建提醒时可以选择重复方式：</p>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="icon">&#128308;</div>
+        <div class="label"><strong>一次性</strong><br>只提醒一次</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#128260;</div>
+        <div class="label"><strong>每天</strong><br>每天同一时间</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#128197;</div>
+        <div class="label"><strong>每周</strong><br>每周同一时间</div>
+      </div>
+      <div class="feature-item">
+        <div class="icon">&#9881;</div>
+        <div class="label"><strong>自定义</strong><br>cron 高级规则</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 常见问题 -->
+  <div class="card">
+    <div class="card-title"><span>&#10067;</span> 常见问题</div>
+    <div style="margin-bottom:12px;">
+      <h3 style="font-size:14px; margin-bottom:4px;">Q：电脑关机后还能收到提醒吗？</h3>
+      <p style="font-size:13px; color:var(--text-muted);">A：不能，服务运行在电脑上。建议保持电脑开机，或者用手机闹钟做备份。</p>
+    </div>
+    <div style="margin-bottom:12px;">
+      <h3 style="font-size:14px; margin-bottom:4px;">Q：数据会丢吗？</h3>
+      <p style="font-size:13px; color:var(--text-muted);">A：不会。所有提醒都保存在 backend/reminders.db 文件中，不删就不会丢。</p>
+    </div>
+    <div>
+      <h3 style="font-size:14px; margin-bottom:4px;">Q：怎么停止服务？</h3>
+      <p style="font-size:13px; color:var(--text-muted);">A：关掉 start_enhanced.bat 的黑窗口即可。</p>
+    </div>
+  </div>
+
+  <!-- 分享方式 -->
+  <div class="card">
+    <div class="card-title"><span>&#128140;</span> 怎么分享给别人</div>
+    <div class="step">
+      <div class="step-icon">&#127759;</div>
+      <div class="step-body">
+        <h3>方法一：同一 WiFi</h3>
+        <p>两台设备连同一个 WiFi，手机扫电脑上的二维码即可。</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-icon">&#128279;</div>
+      <div class="step-body">
+        <h3>方法二：任何地方都能用</h3>
+        <p>先启动 start_enhanced.bat，再双击 setup_cloudflared.bat，生成公开链接发给对方。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>&#128276; 群通知提醒助手 v1.1</p>
+    <p style="margin-top:4px;">有问题随时问我 &#128522;</p>
+  </div>
+
+</div>
+</body>
+</html>
