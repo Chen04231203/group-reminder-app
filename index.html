@@ -169,10 +169,66 @@
             <label>提醒时间</label>
             <input type="datetime-local" id="formDatetime">
           </div>
-          <div class="form-group" id="cronGroup" style="display:none">
-            <label>Cron 表达式</label>
-            <input type="text" id="formCron" placeholder="分 时 日 月 周">
-            <div class="form-hint">例如：0 9 * * 1-5 表示工作日每天9点</div>
+          <!-- 自定义高级时间选择器 -->
+          <div class="form-group" id="customScheduleGroup" style="display:none">
+            <label>自定义重复规则</label>
+            
+            <!-- 预设模板 -->
+            <div class="preset-templates">
+              <div class="preset-title">常用模板</div>
+              <div class="preset-btns">
+                <button type="button" class="preset-btn" data-cron="0 9 * * 1-5">工作日每天9点</button>
+                <button type="button" class="preset-btn" data-cron="0 9 * * 1,3,5">每周一三五</button>
+                <button type="button" class="preset-btn" data-cron="0 9 * * 6,0">每周六日</button>
+                <button type="button" class="preset-btn" data-cron="0 */2 * * *">每2小时</button>
+                <button type="button" class="preset-btn" data-cron="0 0 */3 * *">每3天</button>
+                <button type="button" class="preset-btn" data-cron="0 0 1 * *">每月1号</button>
+              </div>
+            </div>
+            
+            <!-- 星期选择 -->
+            <div class="weekday-selector">
+              <div class="preset-title">选择星期</div>
+              <div class="weekday-btns">
+                <button type="button" class="weekday-btn" data-day="1">周一</button>
+                <button type="button" class="weekday-btn" data-day="2">周二</button>
+                <button type="button" class="weekday-btn" data-day="3">周三</button>
+                <button type="button" class="weekday-btn" data-day="4">周四</button>
+                <button type="button" class="weekday-btn" data-day="5">周五</button>
+                <button type="button" class="weekday-btn" data-day="6">周六</button>
+                <button type="button" class="weekday-btn" data-day="0">周日</button>
+              </div>
+            </div>
+            
+            <!-- 间隔输入 -->
+            <div class="interval-input">
+              <div class="preset-title">间隔重复</div>
+              <div class="interval-row">
+                <span>每</span>
+                <input type="number" id="intervalNum" min="1" max="60" value="2">
+                <select id="intervalUnit">
+                  <option value="hour">小时</option>
+                  <option value="day">天</option>
+                  <option value="week">周</option>
+                </select>
+                <button type="button" class="btn btn-sm" id="btnApplyInterval">应用</button>
+              </div>
+            </div>
+            
+            <!-- 生成的 cron 表达式 -->
+            <div class="cron-result">
+              <label>生成的规则</label>
+              <input type="text" id="formCron" readonly placeholder="选择上方选项自动生成">
+            </div>
+            
+            <!-- 高级模式切换 -->
+            <div class="advanced-toggle">
+              <button type="button" class="btn-text" id="btnAdvancedCron">高级：手动输入 cron 表达式</button>
+            </div>
+            <div id="advancedCronInput" style="display:none">
+              <input type="text" id="formCronManual" placeholder="分 时 日 月 周">
+              <div class="form-hint">格式：分 时 日 月 周（5段，空格分隔）</div>
+            </div>
           </div>
           <div class="form-row">
             <div class="form-group">
