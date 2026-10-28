@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadStats();
   loadReminders();
   initPushUI();
+  initChannels();
 });
 
 // ===== PWA =====
@@ -1014,5 +1015,137 @@ async function testPush() {
   } finally {
     btn.disabled = false;
     btn.textContent = '发一条测试推送';
+  }
+}
+
+// ===== 微信推送（PushPlus）/ 企业微信群机器人 =====
+let wecomConfigured = false;
+
+async function initChannels() {
+  const stateEl = document.getElementById('pushplusState');
+  const input = document.getElementById('pushplusToken');
+  const btn = document.getElementById('btnSavePushplus');
+  const wecomBtn = document.getElementById('btnSaveWecom');
+  if (!btn) return;
+
+  btn.addEventListener('click', savePushplus);
+  if (wecomBtn) wecomBtn.addEventListener('click', saveWecom);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/channels`);
+    const data = await res.json();
+
+    if (data.pushplus_set) {
+      stateEl.textContent = '已配置';
+      stateEl.className = 'push-state on';
+      input.placeholder = (data.pushplus_hint || '已配置') + '（留空则不修改）';
+    }
+
+    const wecomState = document.getElementById('wecomState');
+    wecomConfigured = !!data.wecom_set;
+    if (wecomConfigured) {
+      wecomState.textContent = '已配置';
+      wecomState.className = 'push-state on';
+      document.getElementById('wecomWebhook').placeholder =
+        (data.wecom_hint || '已配置') + '（留空则不修改）';
+    }
+  } catch (e) {
+    console.log('读取推送渠道失败', e);
+  }
+}
+
+async function savePushplus() {
+  const input = document.getElementById('pushplusToken');
+  const stateEl = document.getElementById('pushplusState');
+  const btn = document.getElementById('btnSavePushplus');
+  const token = input.value.trim();
+
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    if (token) {
+      const r = await fetch(`${API_BASE}/api/channels`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pushplus_token: token })
+      });
+      if (!r.ok) throw new Error('保存失败');
+    }
+
+    const t = await fetch(`${API_BASE}/api/channels/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: 'pushplus' })
+    });
+    const data = await t.json();
+
+    if (data.ok) {
+      showToast('已发一条测试消息到微信，去看看');
+      stateEl.textContent = '已配置';
+      stateEl.className = 'push-state on';
+      input.value = '';
+      input.placeholder = '已配置（留空则不修改）';
+    } else {
+      showToast(data.message || '测试失败');
+    }
+  } catch (e) {
+    showToast('操作失败：' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存并测试';
+  }
+}
+
+async function saveWecom() {
+  const input = document.getElementById('wecomWebhook');
+  const stateEl = document.getElementById('wecomState');
+  const btn = document.getElementById('btnSaveWecom');
+  const hook = input.value.trim();
+
+  if (!hook && !wecomConfigured) {
+    showToast('请先粘贴企业微信群机器人 Webhook 地址');
+    return;
+  }
+  if (hook && !hook.includes('qyapi.weixin.qq.com')) {
+    showToast('这不像企业微信机器人地址，检查一下有没有复制完整');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    if (hook) {
+      const r = await fetch(`${API_BASE}/api/channels`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wecom_webhook: hook })
+      });
+      if (!r.ok) throw new Error('保存失败');
+    }
+
+    const t = await fetch(`${API_BASE}/api/channels/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: 'wecom' })
+    });
+    const data = await t.json();
+
+    if (data.ok) {
+      showToast(data.message || '测试消息已发到企业微信群');
+      wecomConfigured = true;
+      stateEl.textContent = '已配置';
+      stateEl.className = 'push-state on';
+      input.value = '';
+      input.placeholder = '已配置（留空则不修改）';
+    } else {
+      showToast(data.message || '发送失败');
+    }
+  } catch (e) {
+    showToast('操作失败：' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存并测试';
   }
 }

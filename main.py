@@ -12,6 +12,7 @@ from typing import Optional
 from urllib.parse import urlparse
 import os
 import json
+import re
 import asyncio
 import httpx
 
@@ -139,6 +140,89 @@ def send_web_push(title: str, content: str, category: str, reminder_id: int) -> 
     return sent
 
 
+# ========== 微信推送（PushPlus）国内安卓主力通道 ==========
+PUSHPLUS_API = "https://www.pushplus.plus/send"
+
+
+def _get_setting(db, key: str, default=None):
+    s = db.query(Settings).filter(Settings.key == key).first()
+    return s.value if s and s.value not in (None, "") else default
+
+
+def _set_setting(db, key: str, value: str):
+    s = db.query(Settings).filter(Settings.key == key).first()
+    if s:
+        s.value = value
+    else:
+        db.add(Settings(key=key, value=value))
+    db.commit()
+
+
+def _split_tokens(raw: str):
+    """支持一个字段填多个 token（逗号/空格/换行分隔），两个人各收各的"""
+    if not raw:
+        return []
+    return [t for t in re.split(r"[,，;；\s]+", raw) if t]
+
+
+def send_pushplus(token: str, title: str, content: str):
+    """通过 PushPlus 推到微信，返回 (是否成功, 提示文字)"""
+    if not token:
+        return False, "未配置 PushPlus Token"
+    try:
+        r = httpx.post(PUSHPLUS_API, json={
+            "token": token,
+            "title": title,
+            "content": content or title,
+            "template": "txt",
+        }, timeout=15)
+        data = r.json()
+        code = data.get("code")
+        if code == 200:
+            return True, "发送成功"
+        # 常见错误码翻译成人话
+        tips = {
+            900: "今天的推送次数用完了，明天凌晨恢复",
+            903: "Token 无效，请检查是否复制完整",
+            905: "账号未实名认证，需先在 PushPlus 公众号完成实名",
+        }
+        return False, tips.get(code, f"PushPlus 返回：{data.get('msg') or data}")
+    except Exception as e:
+        return False, f"请求失败：{e}"
+
+
+# ========== 企业微信群机器人（免费、无条数限制、国内稳定） ==========
+
+
+def send_wecom(webhook: str, title: str, content: str):
+    """推送到企业微信群机器人，返回 (是否成功, 提示文字)"""
+    if not webhook:
+        return False, "未配置企业微信 Webhook"
+    if "qyapi.weixin.qq.com" not in webhook:
+        return False, "这不是企业微信机器人地址，请检查是否复制完整"
+
+    try:
+        md = (f"## {title}\n"
+              f"{content or ''}\n"
+              f"> {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        r = httpx.post(webhook, json={
+            "msgtype": "markdown",
+            "markdown": {"content": md},
+        }, timeout=15)
+        data = r.json()
+        if data.get("errcode") == 0:
+            return True, "发送成功"
+
+        code = data.get("errcode")
+        tips = {
+            93000: "Webhook 地址无效，请重新复制",
+            45009: "发送太频繁了，企业微信限制每分钟 20 条",
+        }
+        return False, tips.get(code, f"企业微信返回：{data.get('errmsg')}（{code}）")
+    except Exception as e:
+        return False, f"请求失败：{e}"
+
+
 # ========== 定时任务调度器 ==========
 scheduler = BackgroundScheduler()
 scheduler.start()
@@ -197,6 +281,30 @@ async def trigger_reminder(reminder_id: int):
                     print(f"Web Push 已发送 {n} 台设备")
             except Exception as e:
                 print(f"Web Push 调度失败: {e}")
+
+        # 微信推送（PushPlus）—— 国内安卓的主力通道，不依赖任何手机设置
+        if reminder.push_enabled:
+            try:
+                tokens = _split_tokens(_get_setting(db, "pushplus_token"))
+                for tk in tokens:
+                    ok, msg = await asyncio.to_thread(
+                        send_pushplus, tk, reminder.title,
+                        reminder.content or reminder.title,
+                    )
+                    print(f"PushPlus 微信推送[{tk[:6]}]: {'成功' if ok else msg}")
+            except Exception as e:
+                print(f"PushPlus 调度失败: {e}")
+
+        # 企业微信群机器人（全局配置，所有提醒共用同一个群）
+        if reminder.push_enabled:
+            try:
+                hook = _get_setting(db, "wecom_webhook")
+                if hook:
+                    ok, msg = await asyncio.to_thread(
+                        send_wecom, hook, reminder.title, reminder.content or "")
+                    print(f"企业微信推送: {'成功' if ok else msg}")
+            except Exception as e:
+                print(f"企业微信调度失败: {e}")
 
 
         # Webhook 推送（企业微信等）
@@ -428,6 +536,9 @@ def get_settings(db: Session = Depends(get_db)):
     settings = db.query(Settings).all()
     result = {}
     for s in settings:
+        # 敏感配置不通过这个接口返回
+        if s.key in ("pushplus_token", "smtp_pass", "wecom_webhook"):
+            continue
         if s.value == "true":
             result[s.key] = True
         elif s.value == "false":
@@ -447,6 +558,101 @@ def update_settings(data: SettingsUpdate, db: Session = Depends(get_db)):
             db.add(setting)
         db.commit()
     return {"message": "设置已更新"}
+
+# ---- 推送渠道配置（PushPlus 微信推送） ----
+
+class ChannelUpdate(BaseModel):
+    pushplus_token: Optional[str] = None
+    wecom_webhook: Optional[str] = None
+
+
+class ChannelTestIn(BaseModel):
+    channel: Optional[str] = "all"   # pushplus / email / all
+
+
+@app.get("/api/channels")
+def get_channels(db: Session = Depends(get_db)):
+    token = _get_setting(db, "pushplus_token", "") or ""
+    hint = ""
+    if token:
+        hint = (token[:4] + "****" + token[-4:]) if len(token) > 10 else "已设置"
+
+    hook = _get_setting(db, "wecom_webhook", "") or ""
+    hook_hint = ""
+    if hook:
+        # 只露出末尾 key 的一小段，避免完整地址外泄
+        hook_hint = "…" + hook[-12:] if len(hook) > 12 else "已设置"
+
+    return {
+        "pushplus_set": bool(token),
+        "pushplus_hint": hint,
+        "wecom_set": bool(hook),
+        "wecom_hint": hook_hint,
+    }
+
+
+@app.put("/api/channels")
+def update_channels(data: ChannelUpdate, db: Session = Depends(get_db)):
+    # 传空字符串表示"不修改"，避免前端拿不到原值时把配置清掉
+    if data.pushplus_token is not None and data.pushplus_token.strip():
+        _set_setting(db, "pushplus_token", data.pushplus_token.strip())
+    if data.wecom_webhook is not None and data.wecom_webhook.strip():
+        hook = data.wecom_webhook.strip()
+        if "qyapi.weixin.qq.com" not in hook:
+            raise HTTPException(
+                status_code=400,
+                detail="这不是企业微信机器人地址，请检查是否复制完整")
+        _set_setting(db, "wecom_webhook", hook)
+    return {"message": "已保存"}
+
+
+@app.post("/api/channels/test")
+async def test_channel(data: ChannelTestIn = None, db: Session = Depends(get_db)):
+    channel = (data.channel if data and data.channel else "all")
+    stamp = datetime.now().strftime("%H:%M:%S")
+    results = []
+
+    # --- PushPlus 微信 ---
+    if channel in ("all", "pushplus"):
+        tokens = _split_tokens(_get_setting(db, "pushplus_token"))
+        if tokens:
+            ok_count, errors = 0, []
+            for tk in tokens:
+                # 内容带时间戳，避免触发「相同内容 1 小时最多 3 条」限制
+                ok, msg = await asyncio.to_thread(
+                    send_pushplus, tk, "测试推送 ✅",
+                    f"看到这条微信消息，就说明提醒能正常推到微信了！\n发送时间：{stamp}")
+                if ok:
+                    ok_count += 1
+                else:
+                    errors.append(msg)
+            if ok_count:
+                extra = f"，{len(errors)} 个失败：{errors[0]}" if errors else ""
+                results.append(("ok", f"微信已发到 {ok_count}/{len(tokens)} 个{extra}"))
+            else:
+                results.append(("fail", errors[0] if errors else "微信发送失败"))
+
+    # --- 企业微信群机器人 ---
+    if channel in ("all", "wecom"):
+        hook = _get_setting(db, "wecom_webhook")
+        if hook:
+            ok, msg = await asyncio.to_thread(
+                send_wecom, hook, "测试提醒 ✅",
+                f"看到这条群消息，就说明企业微信推送已经通了。\n发送时间：{stamp}")
+            results.append(("ok" if ok else "fail",
+                            "企业微信群已收到测试消息" if ok else f"企业微信：{msg}"))
+        elif channel == "wecom":
+            results.append(("fail", "还没填企业微信 Webhook 地址"))
+
+    if not results:
+        return {"ok": False, "message": "还没有配置任何推送渠道"}
+
+    fails = [m for st, m in results if st == "fail"]
+    oks = [m for st, m in results if st == "ok"]
+    if oks:
+        return {"ok": True, "message": "；".join(oks) + ("；失败：" + fails[0] if fails else "")}
+    return {"ok": False, "message": fails[0]}
+
 
 # ---- Web Push 订阅管理 ----
 

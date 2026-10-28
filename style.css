@@ -845,3 +845,46 @@ input:checked + .slider::before { transform: translateX(20px); background: #fff;
 }
 
 .btn-push-test:hover { background: rgba(83, 74, 183, 0.12); }
+
+/* ===== 微信推送（PushPlus） ===== */
+.pushplus-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(150, 150, 170, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  outline: none;
+}
+
+.pushplus-input:focus {
+  border-color: #534AB7;
+  background: rgba(83, 74, 183, 0.12);
+}
+
+.pushplus-input::placeholder {
+  color: rgba(150, 150, 170, 0.8);
+}
+
+.pushplus-link {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.pushplus-link a {
+  color: #7f77e0;
+  text-decoration: none;
+}
+
+.pushplus-link a:hover { text-decoration: underline; }
+
+/* 侧边栏内容多时可滚动 */
+.sidebar-footer {
+  max-height: 62vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}

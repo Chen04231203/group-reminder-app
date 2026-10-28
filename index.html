@@ -84,6 +84,26 @@
           <button class="btn btn-push" id="btnEnablePush">开启系统推送</button>
           <button class="btn btn-ghost btn-push-test" id="btnTestPush" style="display:none">发一条测试推送</button>
         </div>
+        <div class="push-box" id="pushplusBox">
+          <div class="push-title">
+            <span>微信推送</span>
+            <span class="push-state" id="pushplusState">未配置</span>
+          </div>
+          <div class="push-hint">国内安卓首选。你和女朋友各自关注 PushPlus 公众号拿到 Token，用逗号隔开一起填，两人都能收到</div>
+          <input type="text" class="pushplus-input" id="pushplusToken" placeholder="粘贴 Token，多个用逗号隔开" autocomplete="off">
+          <button class="btn btn-push" id="btnSavePushplus">保存并测试</button>
+          <div class="pushplus-link">没有 Token？<a href="https://www.pushplus.plus/" target="_blank" rel="noopener">去免费获取 →</a></div>
+        </div>
+        <div class="push-box" id="wecomBox">
+          <div class="push-title">
+            <span>企业微信推送</span>
+            <span class="push-state" id="wecomState">未配置</span>
+          </div>
+          <div class="push-hint">免费、无条数限制。企业微信群右上角 → 群机器人 → 添加 → 复制 Webhook 地址</div>
+          <input type="text" class="pushplus-input" id="wecomWebhook" placeholder="粘贴 Webhook 地址" autocomplete="off">
+          <button class="btn btn-push" id="btnSaveWecom">保存并测试</button>
+          <div class="pushplus-link">没有企业微信？<a href="https://work.weixin.qq.com/" target="_blank" rel="noopener">个人也能免费注册 →</a></div>
+        </div>
       </div>
     </aside>
 
